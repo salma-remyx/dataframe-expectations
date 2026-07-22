@@ -310,3 +310,31 @@ For security vulnerabilities, please see our [Security Policy](SECURITY.md) or c
 
 ### Legal
 dataframe-expectations is licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE.txt) for the full text.
+
+### Cross-Column Association Rules
+
+Mine logical cross-column rules from a reference DataFrame and enforce them as
+expectations. This is useful for catching data-quality drift where a known
+implication between columns (for example `country="US" => currency="USD"`) stops
+holding in incoming data. Rules are mined by support and confidence, then
+validated like any other expectation — across Pandas, PySpark, and Polars.
+
+```python
+import pandas as pd
+from dataframe_expectations.suite import DataFrameExpectationsSuite
+from dataframe_expectations.expectations.cross_column_rules import mine_association_rules
+
+# Learn rules from trusted reference data
+reference = pd.DataFrame({
+    "country": ["US", "US", "US", "DE", "DE", "DE"],
+    "currency": ["USD", "USD", "USD", "EUR", "EUR", "EUR"],
+})
+rules = mine_association_rules(reference, min_support=0.3, min_confidence=0.8)
+
+# Enforce them on new data — raises if any row breaks a mined rule
+suite = DataFrameExpectationsSuite().expect_cross_column_rules(rules=rules)
+runner = suite.build()
+runner.run(new_data)
+```
+
+Rules may also be authored by hand with `AssociationRule(antecedent={...}, consequent={...}, ...)`.
