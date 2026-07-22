@@ -1,0 +1,19 @@
+schema_version: 1
+fork: salma-remyx/dataframe-expectations
+observed_landing_zones:
+- path: dataframe_expectations/expectations/
+  shape_tags:
+  - library-shape-public-api
+  - registry-add
+  confirmed_by:
+  - arxiv: 2504.19354v4
+    mode: Mode 2 (adapted port)
+    call_site_specifics: "Existing suite forward path \u2014 DataFrameExpectationsSuite().expect_cross_column_rules(...)\
+      \ (a dynamic __getattr__ method, auto-discovered by the registry's existing\
+      \ _load_all_expectations pkgutil.walk_"
+    branch: neurosymbolic-association-rule-mining-from-tabular-data
+    timestamp: '2026-07-22T15:22:06Z'
+  last_observed: '2026-07-22T15:22:06Z'
+rejected_shapes: []
+coordination_signals: []
+last_updated: '2026-07-22T15:22:06Z'
