@@ -13,7 +13,12 @@ observed_landing_zones:
       \ _load_all_expectations pkgutil.walk_"
     branch: neurosymbolic-association-rule-mining-from-tabular-data
     timestamp: '2026-07-22T15:22:06Z'
-  last_observed: '2026-07-22T15:22:06Z'
+  - arxiv: 2504.18633v1
+    mode: ''
+    call_site_specifics: ''
+    branch: statistical-inference-for-clustering-based-anomaly-detection
+    timestamp: '2026-07-27T02:08:34Z'
+  last_observed: '2026-07-27T02:08:34Z'
 rejected_shapes:
 - shape_tag: null
   reason_code: null
@@ -24,4 +29,4 @@ rejected_shapes:
   - arxiv: 2607.21424v1
     timestamp: '2026-07-26T09:49:20Z'
 coordination_signals: []
-last_updated: '2026-07-26T09:49:20Z'
+last_updated: '2026-07-27T02:08:34Z'
