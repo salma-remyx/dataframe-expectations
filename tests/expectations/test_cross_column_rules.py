@@ -15,6 +15,7 @@ from dataframe_expectations.expectations.cross_column_rules import (
     AssociationRule,
     mine_association_rules,
 )
+from dataframe_expectations.neurosymbolic_rule_mining import mine_rules_neurosymbolic
 from dataframe_expectations.registry import DataFrameExpectationRegistry
 from dataframe_expectations.result_message import (
     DataFrameExpectationSuccessMessage,
@@ -40,7 +41,14 @@ def reference_dataframe() -> pd.DataFrame:
 
 @pytest.fixture()
 def mined_rules(reference_dataframe):
-    return mine_association_rules(reference_dataframe, min_support=0.3, min_confidence=0.8)
+    """Mine with the default neurosymbolic (autoencoder) method, deterministically."""
+    return mine_association_rules(
+        reference_dataframe,
+        min_support=0.3,
+        min_confidence=0.8,
+        epochs=600,
+        random_state=42,
+    )
 
 
 def test_expectation_is_auto_discovered_by_registry():
@@ -71,6 +79,44 @@ def test_mine_association_rules_rejects_invalid_thresholds(reference_dataframe):
         mine_association_rules(reference_dataframe, min_support=0.0)
     with pytest.raises(ValueError):
         mine_association_rules(reference_dataframe, min_confidence=1.5)
+
+
+def test_mine_association_rules_rejects_unknown_method(reference_dataframe):
+    with pytest.raises(ValueError):
+        mine_association_rules(reference_dataframe, method="fp-growth")
+
+
+def test_mine_association_rules_apriori_method_remains_available(reference_dataframe):
+    """The frequency-based miner stays reachable as an explicit method."""
+    rules = mine_association_rules(
+        reference_dataframe, min_support=0.3, min_confidence=0.8, method="apriori"
+    )
+    us_rule = next(rule for rule in rules if rule.antecedent == {"country": "US"})
+    assert us_rule.consequent == {"currency": "USD"}
+    assert us_rule.confidence == pytest.approx(1.0)
+
+
+def test_neurosymbolic_mining_is_deterministic_with_seed(reference_dataframe):
+    """A fixed random_state makes autoencoder mining reproducible."""
+    first = mine_association_rules(reference_dataframe, min_support=0.3, epochs=100, random_state=7)
+    second = mine_association_rules(
+        reference_dataframe, min_support=0.3, epochs=100, random_state=7
+    )
+    assert first == second
+
+
+def test_neurosymbolic_rules_carry_continuous_reconstruction_evidence(reference_dataframe):
+    """The miner's rules expose continuous reconstructed probabilities in [0, 1]."""
+    mined = mine_rules_neurosymbolic(
+        reference_dataframe, min_support=0.3, min_confidence=0.8, epochs=600, random_state=42
+    )
+    assert mined
+    for rule in mined:
+        assert 0.0 <= rule.reconstruction <= 1.0
+        assert rule.reconstruction >= 0.8
+    us_rule = next(rule for rule in mined if rule.antecedent == (("country", "US"),))
+    assert us_rule.consequent == ("currency", "USD")
+    assert us_rule.confidence == pytest.approx(1.0)
 
 
 def test_expectation_via_registry_passes_and_fails(mined_rules):

@@ -2,13 +2,14 @@
 
 Adapted from "Neurosymbolic Association Rule Mining from Tabular Data" (Aerial+,
 arXiv:2504.19354). The paper mines logical cross-column rules from tabular data
-and uses them as data-quality constraints. This module keeps that core
-mechanism — association rule mining scored by *support* and *confidence*, with
-the mined rules exposed as a registered expectation — and substitutes the
-paper's learned under-complete neurosymbolic autoencoder (used to compress
-item representations and prune rule explosion) with a parameter-free,
-Apriori-style frequency/confidence pruner. Mining is a fit-time operation over
-a pandas reference DataFrame; validation runs on all supported backends.
+and uses them as data-quality constraints. Rule mining defaults to the paper's
+core mechanism — an under-complete autoencoder trained on the one-hot encoded
+reference data, with rules extracted from its continuous reconstruction
+probabilities (see
+:mod:`dataframe_expectations.neurosymbolic_rule_mining`) — with a
+parameter-free, Apriori-style frequency/confidence miner kept as an alternative
+``method``. Mining is a fit-time operation over a pandas reference DataFrame;
+validation runs on all supported backends.
 """
 
 import itertools
@@ -32,6 +33,7 @@ from dataframe_expectations.core.types import (
     ExpectationCategory,
     ExpectationSubcategory,
 )
+from dataframe_expectations.neurosymbolic_rule_mining import mine_rules_neurosymbolic
 from dataframe_expectations.registry import register_expectation
 from dataframe_expectations.result_message import (
     DataFrameExpectationFailureMessage,
@@ -103,16 +105,75 @@ def mine_association_rules(
     max_antecedent_size: int = 2,
     max_cardinality: int = 50,
     max_rules: Optional[int] = None,
+    method: str = "neurosymbolic",
+    epochs: int = 2,
+    random_state: Optional[int] = None,
 ) -> List[AssociationRule]:
     """Mine cross-column association rules from a reference pandas DataFrame.
 
-    This is the parameter-free substitute for Aerial+'s learned rule miner:
+    With ``method="neurosymbolic"`` (the default) this applies the paper's core
+    mechanism — an under-complete autoencoder trained on the one-hot encoded
+    frame, rules extracted from its continuous reconstruction probabilities —
+    via :func:`dataframe_expectations.neurosymbolic_rule_mining.mine_rules_neurosymbolic`.
+    ``method="apriori"`` selects the frequency-based support/confidence miner.
+
+    :param method: ``"neurosymbolic"`` or ``"apriori"``.
+    :param epochs: Autoencoder training epochs (neurosymbolic method only).
+    :param random_state: Seed for the autoencoder; set for deterministic mining.
+    :return: Mined rules sorted by confidence (desc) then support (desc).
+    Remaining parameters match the Apriori miner below.
+    """
+    if method == "apriori":
+        return _mine_association_rules_apriori(
+            data_frame,
+            columns=columns,
+            min_support=min_support,
+            min_confidence=min_confidence,
+            max_antecedent_size=max_antecedent_size,
+            max_cardinality=max_cardinality,
+            max_rules=max_rules,
+        )
+    if method != "neurosymbolic":
+        raise ValueError(f"method must be 'neurosymbolic' or 'apriori', got {method!r}")
+    mined = mine_rules_neurosymbolic(
+        data_frame,
+        columns=columns,
+        min_support=min_support,
+        min_confidence=min_confidence,
+        max_antecedent_size=max_antecedent_size,
+        max_cardinality=max_cardinality,
+        max_rules=max_rules,
+        epochs=epochs,
+        random_state=random_state,
+    )
+    return [
+        AssociationRule(
+            antecedent=dict(rule.antecedent),
+            consequent={rule.consequent[0]: rule.consequent[1]},
+            support=rule.support,
+            confidence=rule.confidence,
+        )
+        for rule in mined
+    ]
+
+
+def _mine_association_rules_apriori(
+    data_frame: PandasDataFrame,
+    columns: Optional[List[str]] = None,
+    min_support: float = 0.05,
+    min_confidence: float = 0.8,
+    max_antecedent_size: int = 2,
+    max_cardinality: int = 50,
+    max_rules: Optional[int] = None,
+) -> List[AssociationRule]:
+    """Mine cross-column association rules by frequency enumeration.
+
+    This is the parameter-free alternative to the default neurosymbolic miner:
     frequent single items are enumerated, bounded itemsets are assembled
     Apriori-style (an itemset is explored only when every member is frequent),
     and each frequent antecedent is paired with frequent single-item consequents
     whose conditional probability clears ``min_confidence``. Rule explosion is
-    bounded by ``min_support``, ``max_antecedent_size`` and ``max_cardinality``
-    rather than by the paper's under-complete autoencoder.
+    bounded by ``min_support``, ``max_antecedent_size`` and ``max_cardinality``.
 
     :param data_frame: Reference pandas DataFrame to mine rules from.
     :param columns: Columns to consider. Defaults to every column. Columns with

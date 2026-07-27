@@ -338,3 +338,11 @@ runner.run(new_data)
 ```
 
 Rules may also be authored by hand with `AssociationRule(antecedent={...}, consequent={...}, ...)`.
+
+By default, rules are mined neurosymbolically — an under-complete autoencoder
+(NumPy-only, no deep-learning dependency) is trained on the one-hot encoded
+reference data, and rules are extracted from its continuous reconstruction
+probabilities (adapted from "Neurosymbolic Association Rule Mining from Tabular
+Data", Aerial+, arXiv:2504.19354). Pass `method="apriori"` to
+`mine_association_rules` for the frequency-based miner, and use `epochs` /
+`random_state` to control the autoencoder's training and reproducibility.
