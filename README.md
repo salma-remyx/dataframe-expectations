@@ -310,3 +310,36 @@ For security vulnerabilities, please see our [Security Policy](SECURITY.md) or c
 
 ### Legal
 dataframe-expectations is licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE.txt) for the full text.
+
+## Statistical Anomaly Detection
+
+`expect_column_values_not_anomalous` flags rows whose value in a numeric column
+is a **statistically-significant** anomaly. Candidate anomalies are DBSCAN noise
+points; each is reported only when its selective-inference p-value is at most
+`alpha`, which keeps the per-anomaly false-detection probability at `alpha`
+instead of the uncontrolled error rate of trusting every raw DBSCAN noise point.
+
+Adapted from *Statistical Inference for Clustering-based Anomaly Detection*
+(SI-CLAD). DBSCAN and the selective p-value are implemented with NumPy only, so
+no extra dependencies are required.
+
+```python
+from dataframe_expectations import DataFrameExpectationsSuite
+
+suite = (
+    DataFrameExpectationsSuite()
+    .expect_column_values_not_anomalous(
+        column_name="amount",
+        eps=1.5,        # DBSCAN neighbourhood radius (None -> derived from the column)
+        min_samples=4,  # DBSCAN core-point threshold
+        alpha=0.05,     # significance level for the selective p-value
+    )
+)
+
+# Raises if any statistically-significant anomaly is found
+suite.build().run(df)
+```
+
+`std` optionally overrides the assumed Gaussian noise scale (it defaults to the
+scale estimated from the clustered values, which suits a single inlier cluster;
+pass a known scale for multi-cluster columns).
