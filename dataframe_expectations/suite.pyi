@@ -313,6 +313,23 @@ class DataFrameExpectationsSuite:
         """
         ...
 
+    def expect_cross_column_rules(
+        self,
+        tags: Optional[List[str]] = None,
+    ) -> DataFrameExpectationsSuite:
+        """
+        Validate that every row obeys a set of cross-column association rules, typically mined from reference data via mine_association_rules.
+
+        Categories:
+          category: Column Aggregation Expectations
+          subcategory: Any Value
+
+        :param tags: Optional tags as list of strings in "key:value" format (e.g., ["priority:high", "env:test"]).
+
+        :return: An instance of DataFrameExpectationsSuite.
+        """
+        ...
+
     def expect_distinct_column_values_between(
         self,
         column_name: str,

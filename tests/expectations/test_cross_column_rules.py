@@ -41,11 +41,18 @@ def reference_dataframe() -> pd.DataFrame:
 
 @pytest.fixture()
 def mined_rules(reference_dataframe):
-    """Mine with the default neurosymbolic (autoencoder) method, deterministically."""
+    """Mine with the neurosymbolic (autoencoder) opt-in method, deterministically.
+
+    Neurosymbolic (autoencoder) rules cover the same implication anchors
+    the frequency-based Apriori miner does on the reference frame; using
+    the neurosymbolic path here exercises the opt-in code path while the
+    tests still assert the same categorical structure.
+    """
     return mine_association_rules(
         reference_dataframe,
         min_support=0.3,
         min_confidence=0.8,
+        method="neurosymbolic",
         epochs=600,
         random_state=42,
     )
@@ -98,11 +105,47 @@ def test_mine_association_rules_apriori_method_remains_available(reference_dataf
 
 def test_neurosymbolic_mining_is_deterministic_with_seed(reference_dataframe):
     """A fixed random_state makes autoencoder mining reproducible."""
-    first = mine_association_rules(reference_dataframe, min_support=0.3, epochs=100, random_state=7)
+    first = mine_association_rules(
+        reference_dataframe, min_support=0.3, epochs=100, random_state=7,
+        method="neurosymbolic",
+    )
     second = mine_association_rules(
-        reference_dataframe, min_support=0.3, epochs=100, random_state=7
+        reference_dataframe, min_support=0.3, epochs=100, random_state=7,
+        method="neurosymbolic",
     )
     assert first == second
+
+
+def test_neurosymbolic_recovers_the_apriori_anchors_on_reference_data(reference_dataframe):
+    """Fidelity check: on a small reference where the deterministic Apriori
+    miner has a known-good rule set, the neurosymbolic (autoencoder)
+    miner should recover the same categorical implication anchors —
+    otherwise the opt-in path is producing a substantively different
+    quantity from the deterministic default and adopting it would be a
+    silent behavior swap."""
+    apriori_rules = mine_association_rules(
+        reference_dataframe, min_support=0.3, min_confidence=0.8, method="apriori",
+    )
+    neurosymbolic_rules = mine_association_rules(
+        reference_dataframe, min_support=0.3, min_confidence=0.8,
+        method="neurosymbolic", epochs=600, random_state=42,
+    )
+    apriori_anchors = {
+        (frozenset(r.antecedent.items()), frozenset(r.consequent.items()))
+        for r in apriori_rules
+    }
+    neurosymbolic_anchors = {
+        (frozenset(r.antecedent.items()), frozenset(r.consequent.items()))
+        for r in neurosymbolic_rules
+    }
+    # Every deterministic anchor Apriori surfaces must also be surfaced
+    # by the neurosymbolic miner; the neurosymbolic path may surface
+    # additional continuous-probability rules Apriori won't, and that's
+    # allowed. The subset check is the fidelity invariant.
+    assert apriori_anchors.issubset(neurosymbolic_anchors), (
+        f"neurosymbolic miner did not recover apriori anchors:\n"
+        f"  apriori-only: {apriori_anchors - neurosymbolic_anchors}"
+    )
 
 
 def test_neurosymbolic_rules_carry_continuous_reconstruction_evidence(reference_dataframe):

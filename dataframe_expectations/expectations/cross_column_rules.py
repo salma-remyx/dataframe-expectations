@@ -1,14 +1,22 @@
 """Cross-column association rule mining and validation.
 
-Adapted from "Neurosymbolic Association Rule Mining from Tabular Data" (Aerial+,
-arXiv:2504.19354). The paper mines logical cross-column rules from tabular data
-and uses them as data-quality constraints. Rule mining defaults to the paper's
-core mechanism — an under-complete autoencoder trained on the one-hot encoded
-reference data, with rules extracted from its continuous reconstruction
-probabilities (see
-:mod:`dataframe_expectations.neurosymbolic_rule_mining`) — with a
-parameter-free, Apriori-style frequency/confidence miner kept as an alternative
-``method``. Mining is a fit-time operation over a pandas reference DataFrame;
+Two rule miners land together. The default ``method="apriori"`` is a
+parameter-free frequency/confidence miner over the one-hot encoded
+reference DataFrame — deterministic, no training loop, no hyperparameters
+a maintainer has to explain when a rule appears this week and not last
+week. Data-quality pipelines that gate production traffic benefit from
+that auditability.
+
+The alternative ``method="neurosymbolic"`` is an adaptation of
+"Neurosymbolic Association Rule Mining from Tabular Data" (Aerial+,
+arXiv:2504.19354): an under-complete autoencoder trained on the one-hot
+encoded reference data, with rules extracted from its continuous
+reconstruction probabilities (see
+:mod:`dataframe_expectations.neurosymbolic_rule_mining`). It's opt-in
+because the training loop introduces stochasticity (``epochs``,
+``random_state``); pin the seed for reproducible mining.
+
+Mining is a fit-time operation over a pandas reference DataFrame;
 validation runs on all supported backends.
 """
 
@@ -105,19 +113,24 @@ def mine_association_rules(
     max_antecedent_size: int = 2,
     max_cardinality: int = 50,
     max_rules: Optional[int] = None,
-    method: str = "neurosymbolic",
+    method: str = "apriori",
     epochs: int = 2,
     random_state: Optional[int] = None,
 ) -> List[AssociationRule]:
     """Mine cross-column association rules from a reference pandas DataFrame.
 
-    With ``method="neurosymbolic"`` (the default) this applies the paper's core
+    With ``method="apriori"`` (the default) this uses a parameter-free
+    frequency/confidence miner — deterministic, no training loop, no
+    hyperparameters that shift the rule set between runs.
+
+    With ``method="neurosymbolic"`` this applies the Aerial+ paper's core
     mechanism — an under-complete autoencoder trained on the one-hot encoded
     frame, rules extracted from its continuous reconstruction probabilities —
     via :func:`dataframe_expectations.neurosymbolic_rule_mining.mine_rules_neurosymbolic`.
-    ``method="apriori"`` selects the frequency-based support/confidence miner.
+    Opt-in because the training loop is stochastic; pin ``random_state``
+    for reproducible mining.
 
-    :param method: ``"neurosymbolic"`` or ``"apriori"``.
+    :param method: ``"apriori"`` (default) or ``"neurosymbolic"``.
     :param epochs: Autoencoder training epochs (neurosymbolic method only).
     :param random_state: Seed for the autoencoder; set for deterministic mining.
     :return: Mined rules sorted by confidence (desc) then support (desc).

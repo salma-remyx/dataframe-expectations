@@ -339,10 +339,19 @@ runner.run(new_data)
 
 Rules may also be authored by hand with `AssociationRule(antecedent={...}, consequent={...}, ...)`.
 
-By default, rules are mined neurosymbolically — an under-complete autoencoder
-(NumPy-only, no deep-learning dependency) is trained on the one-hot encoded
-reference data, and rules are extracted from its continuous reconstruction
-probabilities (adapted from "Neurosymbolic Association Rule Mining from Tabular
-Data", Aerial+, arXiv:2504.19354). Pass `method="apriori"` to
-`mine_association_rules` for the frequency-based miner, and use `epochs` /
-`random_state` to control the autoencoder's training and reproducibility.
+The default miner is a parameter-free frequency/confidence Apriori pass —
+deterministic and easy to audit ("here's the rule, here's the support and
+confidence it was mined at"). Data pipelines that gate production traffic
+benefit from that auditability.
+
+An alternative neurosymbolic miner is available as opt-in via
+`method="neurosymbolic"` — an under-complete autoencoder (NumPy-only, no
+deep-learning dependency) trained on the one-hot encoded reference data,
+with rules extracted from its continuous reconstruction probabilities
+(adapted from "Neurosymbolic Association Rule Mining from Tabular Data",
+Aerial+, [arXiv:2504.19354](https://arxiv.org/abs/2504.19354)). Because
+autoencoder training is stochastic, pin `random_state` and `epochs` for
+reproducible mining. Useful when Apriori's cartesian antecedent
+enumeration is too expensive on wide one-hot encodings, or when the
+paper's continuous reconstruction probability is a useful per-rule
+signal to expose downstream.
