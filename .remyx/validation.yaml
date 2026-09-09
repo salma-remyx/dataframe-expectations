@@ -1,0 +1,40 @@
+benchmarks:
+  - suite: "eval/eval_cross_column_rules.py"
+    scorer: cross_column_rule_recall
+    baseline: main
+    metrics:
+      - key: cross_column_rule_recall
+        role: target
+        direction: max
+        # 5 planted deterministic implications (country->currency x3, plan->tier x2);
+        # Apriori with min_support=0.05/min_confidence=0.9 should recover all 5 (recall=1.0)
+        # since every antecedent value maps to exactly one consequent value in the
+        # synthetic reference frame. Baseline (feature absent) recalls 0. 0.8 leaves
+        # margin for enumeration-order edge cases while still separating the arms.
+        threshold: 0.8
+      - key: cross_column_mining_determinism_rate
+        role: guardrail
+        direction: max
+        # Fraction of mined rule-sets identical across two calls with identical
+        # inputs. Apriori has no training loop/RNG, so this must be exactly 1.0;
+        # baseline's fallback (empty list both times) is trivially 1.0 too, so the
+        # guardrail cannot fail on baseline but does fail if mining becomes
+        # nondeterministic (e.g. an unseeded stochastic default).
+        threshold: 1.0
+    held_constant:
+      - "same synthetic reference DataFrame (600 rows, 2 planted deterministic implication families) across both arms"
+      - "same min_support=0.05 / min_confidence=0.9 / max_antecedent_size / max_cardinality thresholds"
+      - "same method='apriori' argument passed explicitly on both arms"
+    avoid:
+      - "no network access"
+      - "no wall-clock timing (mining cost is not the claim; correctness/determinism is)"
+      - "no real pyspark/polars import required — only pandas, mirroring the module's own lazy-proxy import pattern"
+    compute:
+      tier: cpu
+    provenance:
+      cross_column_rule_recall: "synthesized from PR source dataframe_expectations/expectations/cross_column_rules.py (mine_association_rules apriori docstring: 'parameter-free frequency/confidence miner ... deterministic')"
+      cross_column_mining_determinism_rate: "synthesized from PR description: 'Deterministic Apriori miner as the default ... no hyperparameters that shift the rule set between runs'"
+      held_constant: "synthesized from PR docstrings describing mine_association_rules parameters"
+      suite: "synthesized, mirrors tests/expectations/test_cross_column_rules.py style (direct calls to mine_association_rules)"
+    policy:
+      guardrail_veto: true

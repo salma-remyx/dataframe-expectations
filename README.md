@@ -310,3 +310,48 @@ For security vulnerabilities, please see our [Security Policy](SECURITY.md) or c
 
 ### Legal
 dataframe-expectations is licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE.txt) for the full text.
+
+### Cross-Column Association Rules
+
+Mine logical cross-column rules from a reference DataFrame and enforce them as
+expectations. This is useful for catching data-quality drift where a known
+implication between columns (for example `country="US" => currency="USD"`) stops
+holding in incoming data. Rules are mined by support and confidence, then
+validated like any other expectation — across Pandas, PySpark, and Polars.
+
+```python
+import pandas as pd
+from dataframe_expectations.suite import DataFrameExpectationsSuite
+from dataframe_expectations.expectations.cross_column_rules import mine_association_rules
+
+# Learn rules from trusted reference data
+reference = pd.DataFrame({
+    "country": ["US", "US", "US", "DE", "DE", "DE"],
+    "currency": ["USD", "USD", "USD", "EUR", "EUR", "EUR"],
+})
+rules = mine_association_rules(reference, min_support=0.3, min_confidence=0.8)
+
+# Enforce them on new data — raises if any row breaks a mined rule
+suite = DataFrameExpectationsSuite().expect_cross_column_rules(rules=rules)
+runner = suite.build()
+runner.run(new_data)
+```
+
+Rules may also be authored by hand with `AssociationRule(antecedent={...}, consequent={...}, ...)`.
+
+The default miner is a parameter-free frequency/confidence Apriori pass —
+deterministic and easy to audit ("here's the rule, here's the support and
+confidence it was mined at"). Data pipelines that gate production traffic
+benefit from that auditability.
+
+An alternative neurosymbolic miner is available as opt-in via
+`method="neurosymbolic"` — an under-complete autoencoder (NumPy-only, no
+deep-learning dependency) trained on the one-hot encoded reference data,
+with rules extracted from its continuous reconstruction probabilities
+(adapted from "Neurosymbolic Association Rule Mining from Tabular Data",
+Aerial+, [arXiv:2504.19354](https://arxiv.org/abs/2504.19354)). Because
+autoencoder training is stochastic, pin `random_state` and `epochs` for
+reproducible mining. Useful when Apriori's cartesian antecedent
+enumeration is too expensive on wide one-hot encodings, or when the
+paper's continuous reconstruction probability is a useful per-rule
+signal to expose downstream.
